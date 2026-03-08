@@ -1,24 +1,13 @@
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const text = await req.text();
-    const body = JSON.parse(text);
-    const { brandName, industry, objective, tone, products, extraContext } = body;
+    const { brandName, industry, objective, tone, products, extraContext } = req.body;
 
     const prompt = `You are an expert social media strategist and copywriter.
 
@@ -71,22 +60,18 @@ Respond ONLY with a valid JSON object in this exact format (no markdown, no expl
     );
 
     const data = await geminiRes.json();
-    if (!geminiRes.ok) throw new Error(data.error?.message || 'Gemini API error');
+
+    if (!geminiRes.ok) {
+      return res.status(500).json({ error: 'Gemini API error', details: data.error?.message });
+    }
 
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
 
-    return new Response(JSON.stringify(parsed), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return res.status(200).json(parsed);
+
   } catch (err) {
-    return new Response(JSON.stringify({ error: 'Generation failed', details: err.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return res.status(500).json({ error: 'Generation failed', details: err.message });
   }
 }
