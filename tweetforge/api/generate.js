@@ -16,7 +16,8 @@ export default async function handler(req) {
   }
 
   try {
-    const body = await req.json();
+    const text = await req.text();
+    const body = JSON.parse(text);
     const { brandName, industry, objective, tone, products, extraContext } = body;
 
     const prompt = `You are an expert social media strategist and copywriter.
